@@ -235,6 +235,79 @@ theorem last_bound_step_keep
   simp
   exact h_v_le
 
+-- Combined bullet 7/8 helper: after one merge step, the new "last element"
+-- is ≤ the corresponding next candidate on a given side.
+-- Direction = left means we bound against new_i (i'); right means against new_j (j').
+theorem merge_step_left_bound
+  (old a3 a7 a28 : Arr Int) (lo mid hi out i j i' j' : Int)
+  (h_eq : vectors_arr_eq_between a3 old lo (hi + 1))
+  (h_old_sort_l : sort_is_sorted_between old lo (mid + 1))
+  (h_old_sort_r : sort_is_sorted_between old (mid + 1) (hi + 1))
+  (h_lo_out : lo ≤ out) (h_out_hi : out ≤ hi)
+  (h_lo_i : lo ≤ i) (h_mid_j : mid + 1 ≤ j) (h_mid_hi : mid < hi)
+  (h_i_le_mid : i ≤ mid)
+  (h_step :
+    (j > hi ∧ a28 = vectors_arr_set a7 out (vectors_arr_get a3 i) ∧ i' = i + 1 ∧ j' = j) ∨
+    (vectors_arr_get a3 j < vectors_arr_get a3 i ∧
+       a28 = vectors_arr_set a7 out (vectors_arr_get a3 j) ∧ i' = i ∧ j' = j + 1) ∨
+    (¬ vectors_arr_get a3 j < vectors_arr_get a3 i ∧
+       a28 = vectors_arr_set a7 out (vectors_arr_get a3 i) ∧ i' = i + 1 ∧ j' = j))
+  (hi'_mid : i' ≤ mid)
+  : a28 (out + 1 - 1) ≤ a3 i' := by
+  have h_idx : out + 1 - 1 = out := by omega
+  have h_a3_sort_l : sort_is_sorted_between a3 lo (mid + 1) :=
+    sorted_of_eq_between a3 old lo (hi + 1) lo (mid + 1) h_eq h_old_sort_l
+      (by omega) (by omega)
+  rcases h_step with ⟨_, ha28, hi', _⟩ | ⟨h_lt, ha28, hi', _⟩ | ⟨h_ge, ha28, hi', _⟩
+  -- Case L: take left, i' = i+1, a28 writes a3 i. Bound a3 i ≤ a3 (i+1) via sortedness.
+  · rw [h_idx, ha28, hi']
+    have : i + 1 ≤ mid := by omega
+    exact last_bound_step_same_half a7 _ a3 lo mid out i (i + 1)
+      h_a3_sort_l rfl h_lo_i (by omega) (by omega)
+  -- Case R: take right, i' = i, a28 writes a3 j. Need a3 j ≤ a3 i. Have a3 j < a3 i.
+  · rw [h_idx, ha28, hi']
+    have h_lt' : a3 j < a3 i := h_lt
+    exact last_bound_step_keep a7 _ a3 out i _ rfl (Int.le_of_lt h_lt')
+  -- Case Le: take left, i' = i+1, a28 writes a3 i. Same as Case L.
+  · rw [h_idx, ha28, hi']
+    have : i + 1 ≤ mid := by omega
+    exact last_bound_step_same_half a7 _ a3 lo mid out i (i + 1)
+      h_a3_sort_l rfl h_lo_i (by omega) (by omega)
+
+theorem merge_step_right_bound
+  (old a3 a7 a28 : Arr Int) (lo mid hi out i j i' j' : Int)
+  (h_eq : vectors_arr_eq_between a3 old lo (hi + 1))
+  (h_old_sort_l : sort_is_sorted_between old lo (mid + 1))
+  (h_old_sort_r : sort_is_sorted_between old (mid + 1) (hi + 1))
+  (h_lo_out : lo ≤ out) (h_out_hi : out ≤ hi)
+  (h_lo_i : lo ≤ i) (h_mid_j : mid + 1 ≤ j) (h_mid_hi : mid < hi)
+  (h_i_le_mid : i ≤ mid)
+  (h_step :
+    (j > hi ∧ a28 = vectors_arr_set a7 out (vectors_arr_get a3 i) ∧ i' = i + 1 ∧ j' = j) ∨
+    (vectors_arr_get a3 j < vectors_arr_get a3 i ∧
+       a28 = vectors_arr_set a7 out (vectors_arr_get a3 j) ∧ i' = i ∧ j' = j + 1) ∨
+    (¬ vectors_arr_get a3 j < vectors_arr_get a3 i ∧
+       a28 = vectors_arr_set a7 out (vectors_arr_get a3 i) ∧ i' = i + 1 ∧ j' = j))
+  (hj'_hi : j' ≤ hi)
+  : a28 (out + 1 - 1) ≤ a3 j' := by
+  have h_idx : out + 1 - 1 = out := by omega
+  have h_a3_sort_r : sort_is_sorted_between a3 (mid + 1) (hi + 1) :=
+    sorted_of_eq_between a3 old lo (hi + 1) (mid + 1) (hi + 1) h_eq h_old_sort_r
+      (by omega) (by omega)
+  rcases h_step with ⟨h_jhi, ha28, _, hj'⟩ | ⟨_, ha28, _, hj'⟩ | ⟨h_ge, ha28, _, hj'⟩
+  -- Case L: j' = j > hi, contradiction with j' ≤ hi
+  · rw [h_idx, ha28, hj']
+    exfalso; omega
+  -- Case R: take right, j' = j+1, a28 writes a3 j. Bound a3 j ≤ a3 (j+1).
+  · rw [h_idx, ha28, hj']
+    have : j + 1 ≤ hi := by omega
+    exact last_bound_step_same_half a7 _ a3 (mid + 1) hi out j (j + 1)
+      h_a3_sort_r rfl h_mid_j (by omega) (by omega)
+  -- Case Le: take left (¬ a3 j < a3 i), j' = j, a28 writes a3 i. Need a3 i ≤ a3 j.
+  · rw [h_idx, ha28, hj']
+    have h_ge' : ¬ a3 j < a3 i := h_ge
+    exact last_bound_step_keep a7 _ a3 out j _ rfl (Int.not_lt.mp h_ge')
+
 set_option maxHeartbeats 2000000
 
 def SortMerge_proof : SortMerge := by
