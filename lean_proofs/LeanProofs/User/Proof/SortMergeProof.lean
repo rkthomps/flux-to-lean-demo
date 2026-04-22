@@ -102,45 +102,41 @@ theorem eq_mix_perm (old a3 a7 : Arr Int) (lo mid hi out i j k : Int)
     refine ⟨hylo, ylehi, ?_⟩
     simpa [h_eq] using hxy
 
--- -- a28 = arr_set a7 out (arr_get a3 i)
---       -- is_mix a7 a3 a3 lo lo (mid + 1) out i j
---       -- sorted_between a7 lo out
-
--- theorem grind_set_mix_sorted_sorted
---   (a28 a7 a3 : Arr Int)
---   (h1 : a28 = vectors_arr_set a7 out (vectors_arr_get a3 i))
---   (h2 : is_mix a7 a3 a3 lo lo (mid + 1) out i j)
---   (h3 : sort_is_sorted_between a7 lo out)
---   (hlast_ge : out = lo ∨ a7 (out - 1) ≤ vectors_arr_get a3 i)
---   (hlm : lo ≤ mid)
---   (hi_hi : i ≤ hi + 1)
---   (hj_hi : j ≤ hi + 1)
---   (hijout : i + j - lo - mid - 1 = out - lo)
---   : sort_is_sorted_between a28 lo (out + 1) := by
---   subst h1
---   intro x y hxy
---   rcases hxy with ⟨hxlo, hxy_lt, hy_out1⟩
---   have hy_le_out : y ≤ out := by omega
---   by_cases hy_eq_out : y = out
---   · have hx_out : x < out := by omega
---     have hx_ne_out : x ≠ out := by omega
---     have hx_bound : a7 x ≤ vectors_arr_get a3 i := by
---       rcases hlast_ge with h_out_lo | h_last
---       · exfalso
---         omega
---       · by_cases hx_last : x = out - 1
---         · simpa [hx_last] using h_last
---         · have hx_lt_last : x < out - 1 := by omega
---           have hs : a7 x ≤ a7 (out - 1) := h3 x (out - 1) ⟨hxlo, hx_lt_last, by omega⟩
---           calc
---             a7 x ≤ a7 (out - 1) := hs
---             _ ≤ vectors_arr_get a3 i := h_last
---     simpa [vectors_arr_set, hy_eq_out, hx_ne_out] using hx_bound
---   · have hy_out : y < out := by omega
---     have hs : a7 x ≤ a7 y := h3 x y ⟨hxlo, hxy_lt, hy_out⟩
---     have hx_ne_out : x ≠ out := by omega
---     have hy_ne_out : y ≠ out := by omega
---     simpa [vectors_arr_set, hx_ne_out, hy_ne_out] using hs
+-- a28 = arr_set a7 out (arr_get a3 i)
+-- sorted_between a7 lo out
+-- Helper lemma: setting position `out` to value v preserves sortedness
+-- provided the previous last element is ≤ v (or out = lo, in which case the
+-- resulting range has only one element).
+theorem set_preserves_sorted
+  (a28 a7 : Arr Int) (lo out : Int) (v : Int)
+  (h1 : a28 = vectors_arr_set a7 out v)
+  (h3 : sort_is_sorted_between a7 lo out)
+  (hlast_ge : out = lo ∨ a7 (out - 1) ≤ v)
+  : sort_is_sorted_between a28 lo (out + 1) := by
+  subst h1
+  intro x y hxy
+  rcases hxy with ⟨hxlo, hxy_lt, hy_out1⟩
+  have hy_le_out : y ≤ out := by omega
+  by_cases hy_eq_out : y = out
+  · have hx_out : x < out := by omega
+    have hx_ne_out : x ≠ out := by omega
+    have hx_bound : a7 x ≤ v := by
+      rcases hlast_ge with h_out_lo | h_last
+      · exfalso
+        omega
+      · by_cases hx_last : x = out - 1
+        · simpa [hx_last] using h_last
+        · have hx_lt_last : x < out - 1 := by omega
+          have hs : a7 x ≤ a7 (out - 1) := h3 x (out - 1) ⟨hxlo, hx_lt_last, by omega⟩
+          calc
+            a7 x ≤ a7 (out - 1) := hs
+            _ ≤ v := h_last
+    simpa [vectors_arr_set, hy_eq_out, hx_ne_out] using hx_bound
+  · have hy_out : y < out := by omega
+    have hs : a7 x ≤ a7 y := h3 x y ⟨hxlo, hxy_lt, hy_out⟩
+    have hx_ne_out : x ≠ out := by omega
+    have hy_ne_out : y ≠ out := by omega
+    simpa [vectors_arr_set, hx_ne_out, hy_ne_out] using hs
 
 set_option maxHeartbeats 600000
 
@@ -166,16 +162,16 @@ def SortMerge_proof : SortMerge := by
     -- ordered_mix a7 a3 a3 lo lo (mid + 1) out i j
   · unfold k0 k2 k13 at *
     split_hyps
-    · sorry
-    · sorry
+    · first | grind [is_mix, maintains_order, is_ordered_mix, eq_mix_perm, set_preserves_sorted] | sorry
+    · first | grind [is_mix, maintains_order, is_ordered_mix, eq_mix_perm, set_preserves_sorted] | sorry
     · grind
     · grind
-    · sorry
-    · sorry
-  · sorry
-  · sorry
-  · sorry
-  · sorry
-  · sorry
+    · first | grind [is_mix, maintains_order, is_ordered_mix, eq_mix_perm, set_preserves_sorted] | sorry
+    · first | grind [is_mix, maintains_order, is_ordered_mix, eq_mix_perm, set_preserves_sorted] | sorry
+  · first | grind [is_mix, maintains_order, is_ordered_mix, eq_mix_perm, set_preserves_sorted] | sorry
+  · first | grind [is_mix, maintains_order, is_ordered_mix, eq_mix_perm, set_preserves_sorted] | sorry
+  · first | grind [is_mix, maintains_order, is_ordered_mix, eq_mix_perm, set_preserves_sorted] | sorry
+  · first | grind [is_mix, maintains_order, is_ordered_mix, eq_mix_perm, set_preserves_sorted] | sorry
+  · first | grind [is_mix, maintains_order, is_ordered_mix, eq_mix_perm, set_preserves_sorted] | sorry
 
 end F
