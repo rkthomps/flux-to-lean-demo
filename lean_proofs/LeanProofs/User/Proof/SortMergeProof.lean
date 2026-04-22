@@ -26,16 +26,16 @@ def is_ordered_mix (v1 v2 v3 : Arr Int) (l1 l2 l3 r1 r2 r3 : Int) : Prop :=
 def bounded_above (v1 v2 : Arr Int) (l1 r1 idx : Int) : Prop :=
   ∀ p, l1 ≤ p ∧ p < r1 → v1 p ≤ v2 idx
 
-def k0 (k : Int) (a2 : (Arr Int)) (a2len : Int) (ol : (Arr Int)) (oldlen : Int) (lo : Int) (mid : Int) (hi : Int) (auxo : (Arr Int)) (auxolen : Int) : Prop :=
+def k0 (k : Int) (a2 : (Arr Int)) (a2len : Int) (ol : (Arr Int)) (oldlen : Int) (lo : Int) (_mid : Int) (hi : Int) (auxo : (Arr Int)) (auxolen : Int) : Prop :=
   ((k ≥ 0) ∧ (k ≥ lo) ∧ (k ≤ oldlen) ∧ k ≤ hi + 1) ∧
-  a2len = oldlen ∧
+  a2len = oldlen ∧ auxolen = oldlen ∧
   is_frame auxo a2 lo (hi + 1) ∧
   vectors_arr_eq_between a2 ol lo k
 
 def k1 (a'₆₀ : Int) (a'₆₁ : Int) (a'₆₂ : (Arr Int)) (a'₆₃ : Int) (a'₆₄ : (Arr Int)) (a'₆₅ : Int) (a'₆₆ : Int) (a'₆₇ : Int) (a'₆₈ : Int) (a'₆₉ : (Arr Int)) (a'₇₀ : Int) : Prop :=
   True
 
-def k2 (out : Int) (j : Int) (a6 : (Arr Int)) (a6len : Int) (i : Int) (old : (Arr Int)) (oldlen : Int) (lo : Int) (mid : Int) (hi : Int) (auxo : (Arr Int)) (auxolen : Int) (a'₈₂ : Int) (a2 : (Arr Int)) (a2len : Int) : Prop :=
+def k2 (out : Int) (j : Int) (a6 : (Arr Int)) (a6len : Int) (i : Int) (old : (Arr Int)) (oldlen : Int) (lo : Int) (mid : Int) (hi : Int) (_auxo : (Arr Int)) (_auxolen : Int) (a'₈₂ : Int) (a2 : (Arr Int)) (a2len : Int) : Prop :=
   ((out ≥ 0) ∧ (out ≥ i) ∧ (out ≥ lo) ∧ (out ≤ a'₈₂) ∧ (out ≤ oldlen)) ∧
   a6len = oldlen ∧ a2len = a6len ∧
   sort_is_sorted_between a6 lo out ∧
@@ -45,10 +45,8 @@ def k2 (out : Int) (j : Int) (a6 : (Arr Int)) (a6len : Int) (i : Int) (old : (Ar
   is_mix a6 a2 a2 lo lo (mid + 1) out i j ∧
   i ≤ hi + 1 ∧ j ≤ hi + 1 ∧
   lo ≤ i ∧ mid + 1 ≤ j ∧
-  -- Weaker bound: only the last placed element is bounded by the next candidates.
   (lo < out → i ≤ mid → a6 (out - 1) ≤ a2 i) ∧
   (lo < out → j ≤ hi → a6 (out - 1) ≤ a2 j) ∧
-  -- aux equals old on the merge range so that we can transfer sortedness of old to a2
   vectors_arr_eq_between a2 old lo (hi + 1)
 
 def k3 (a'₃₄ : Int) (a'₃₅ : Int) (a'₃₆ : Int) (a'₃₇ : (Arr Int)) (a'₃₈ : Int) (a'₃₉ : Int) (a'₄₀ : (Arr Int)) (a'₄₁ : Int) (a'₄₂ : Int) (a'₄₃ : Int) (a'₄₄ : Int) (a'₄₅ : (Arr Int)) (a'₄₆ : Int) (a'₄₇ : Int) (a'₄₈ : (Arr Int)) (a'₄₉ : Int) : Prop :=
@@ -335,6 +333,12 @@ def SortMerge_proof : SortMerge := by
   · -- is_mix a'₂₈ a'₃ a'₃ lo lo (mid+1) (out+1) i₃ j₃
     sorry
   · -- a'₂₈ (out+1-1) ≤ a'₃ i₃ (left bound preservation)
+    --
+    -- Work-in-progress: the invariant and helper lemmas
+    -- (`merge_step_left_bound`, `last_bound_step_same_half`, ...) needed to
+    -- close this goal are in place; what remains is the tactic plumbing to
+    -- destructure the unfolded `k13` disjunction after `zap` and feed those
+    -- helpers the right arguments.
     sorry
   · -- a'₂₈ (out+1-1) ≤ a'₃ j₃ (right bound preservation)
     sorry
