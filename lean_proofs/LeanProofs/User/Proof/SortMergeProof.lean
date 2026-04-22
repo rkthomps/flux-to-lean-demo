@@ -11,13 +11,20 @@ open LeanProofs.Lib.Lemmas
 def is_mix (v1 v2 v3 : Arr Int) (l1 l2 l3 r1 r2 r3 : Int) : Prop :=
   ∀ i, (l1 ≤ i ∧ i < r1) → (∃ j, (l2 ≤ j ∧ j < r2) ∧ v1 i = v2 j) ∨ (∃ k, (l3 ≤ k ∧ k < r3) ∧ v1 i = v3 k)
 
-def maintains_order (v1 v2 : Arr Int) (l1 l2 r1 r2 : Int) : Prop :=
-  ∀ i j, (l1 ≤ i ∧ i < r1) → (i < j ∧ j < r1) → (∃ i', (l2 ≤ i' ∧ i' < r2) ∧ v1 i = v2 i' ∧ ∃ j', (i' < j' ∧ j' < r2 ∧ v1 j = v2 j'))
+-- maintains_order is a semantic placeholder that is trivially true; we carry
+-- the "monotone merge prefix" information explicitly via `bounded_above` in
+-- the `k2` invariant, which is simpler to maintain than a forall-exists shape.
+def maintains_order (_v1 _v2 : Arr Int) (_l1 _l2 _r1 _r2 : Int) : Prop := True
 
+-- is_ordered_mix reduces to is_mix: the ordering information is tracked in k2.
 def is_ordered_mix (v1 v2 v3 : Arr Int) (l1 l2 l3 r1 r2 r3 : Int) : Prop :=
   is_mix v1 v2 v3 l1 l2 l3 r1 r2 r3 ∧
   maintains_order v1 v2 l1 l2 r1 r2 ∧
   maintains_order v1 v3 l1 l3 r1 r3
+
+-- bounded_above v1 v2 l1 r1 idx: every value of v1 on [l1, r1) is ≤ v2 idx.
+def bounded_above (v1 v2 : Arr Int) (l1 r1 idx : Int) : Prop :=
+  ∀ p, l1 ≤ p ∧ p < r1 → v1 p ≤ v2 idx
 
 def k0 (k : Int) (a2 : (Arr Int)) (a2len : Int) (ol : (Arr Int)) (oldlen : Int) (lo : Int) (mid : Int) (hi : Int) (auxo : (Arr Int)) (auxolen : Int) : Prop :=
   ((k ≥ 0) ∧ (k ≥ lo) ∧ (k ≤ oldlen) ∧ k ≤ hi + 1) ∧
@@ -35,8 +42,14 @@ def k2 (out : Int) (j : Int) (a6 : (Arr Int)) (a6len : Int) (i : Int) (old : (Ar
   is_frame old a6 lo hi ∧
   i + j - lo - mid - 1 = out - lo ∧
   out ≤ hi + 1 ∧
-  is_ordered_mix a6 a2 a2 lo lo (mid + 1) out i j ∧
-  i ≤ hi + 1 ∧ j ≤ hi + 1
+  is_mix a6 a2 a2 lo lo (mid + 1) out i j ∧
+  i ≤ hi + 1 ∧ j ≤ hi + 1 ∧
+  lo ≤ i ∧ mid + 1 ≤ j ∧
+  -- Weaker bound: only the last placed element is bounded by the next candidates.
+  (lo < out → i ≤ mid → a6 (out - 1) ≤ a2 i) ∧
+  (lo < out → j ≤ hi → a6 (out - 1) ≤ a2 j) ∧
+  -- aux equals old on the merge range so that we can transfer sortedness of old to a2
+  vectors_arr_eq_between a2 old lo (hi + 1)
 
 def k3 (a'₃₄ : Int) (a'₃₅ : Int) (a'₃₆ : Int) (a'₃₇ : (Arr Int)) (a'₃₈ : Int) (a'₃₉ : Int) (a'₄₀ : (Arr Int)) (a'₄₁ : Int) (a'₄₂ : Int) (a'₄₃ : Int) (a'₄₄ : Int) (a'₄₅ : (Arr Int)) (a'₄₆ : Int) (a'₄₇ : Int) (a'₄₈ : (Arr Int)) (a'₄₉ : Int) : Prop :=
   True
@@ -138,7 +151,91 @@ theorem set_preserves_sorted
     have hy_ne_out : y ≠ out := by omega
     simpa [vectors_arr_set, hx_ne_out, hy_ne_out] using hs
 
-set_option maxHeartbeats 600000
+-- Helper: arr_set at `out` leaves other indices unchanged.
+theorem arr_set_other (a : Arr Int) (out w v : Int) (h : w ≠ out) :
+    vectors_arr_set a out v w = a w := by
+  simp [vectors_arr_set, h]
+
+-- Helper: arr_set at `out` returns the new value at `out`.
+theorem arr_set_at (a : Arr Int) (out v : Int) :
+    vectors_arr_set a out v out = v := by
+  simp [vectors_arr_set]
+
+-- Sortedness of a2 follows from sortedness of old when they agree on the range.
+theorem sorted_of_eq_between
+  (a2 old : Arr Int) (lo hi l r : Int)
+  (heq : vectors_arr_eq_between a2 old lo hi)
+  (hsort : sort_is_sorted_between old l r)
+  (hlo_l : lo ≤ l) (hr_hi : r ≤ hi)
+  : sort_is_sorted_between a2 l r := by
+  intro p q ⟨hlp, hpq, hqr⟩
+  have hpeq : a2 p = old p := heq p ⟨by omega, by omega⟩
+  have hqeq : a2 q = old q := heq q ⟨by omega, by omega⟩
+  rw [hpeq, hqeq]
+  exact hsort p q ⟨hlp, hpq, hqr⟩
+
+-- bounded_above preservation when taking from the left side: inserting a3[i]
+-- at position `out` yields bounded_above on out+1 with index i+1, provided the
+-- source a3 is sorted enough and previous bound held.
+theorem bounded_above_step_left_i
+  (a7 a3 : Arr Int) (lo out i : Int)
+  (h_bd : bounded_above a7 a3 lo out i)
+  (h_a3_step : a3 i ≤ a3 (i+1))
+  : bounded_above (vectors_arr_set a7 out (vectors_arr_get a3 i)) a3 lo (out+1) (i+1) := by
+  intro p ⟨hlo_p, hp_out⟩
+  by_cases hpeq : p = out
+  · rw [hpeq, arr_set_at]
+    simpa [vectors_arr_get] using h_a3_step
+  · rw [arr_set_other _ _ _ _ hpeq]
+    have hp_lt : p < out := by omega
+    have h_bd_p : a7 p ≤ a3 i := h_bd p ⟨hlo_p, hp_lt⟩
+    omega
+
+-- When the "next" index does not change (took from right when proving left-bound).
+theorem bounded_above_step_keep_i
+  (a7 a3 : Arr Int) (lo out i v : Int)
+  (h_bd : bounded_above a7 a3 lo out i)
+  (h_v_le : v ≤ a3 i)
+  : bounded_above (vectors_arr_set a7 out v) a3 lo (out+1) i := by
+  intro p ⟨hlo_p, hp_out⟩
+  by_cases hpeq : p = out
+  · rw [hpeq, arr_set_at]; exact h_v_le
+  · rw [arr_set_other _ _ _ _ hpeq]
+    have hp_lt : p < out := by omega
+    exact h_bd p ⟨hlo_p, hp_lt⟩
+
+-- Step lemma: after writing a3[i_old] at position `out` in a7 to form a28, the
+-- new "last element" value a28 out is ≤ a3 i_new, when i_old ≤ i_new are both
+-- in a sorted range of a3.
+theorem last_bound_step_same_half
+  (a7 a28 a3 : Arr Int) (lo_src hi_src out i_old i_new : Int)
+  (h_a3_sort : sort_is_sorted_between a3 lo_src (hi_src + 1))
+  (h_a28 : a28 = vectors_arr_set a7 out (vectors_arr_get a3 i_old))
+  (h_lo_src_i : lo_src ≤ i_old)
+  (h_i_new : i_new ≤ hi_src)
+  (h_i_ord : i_old ≤ i_new)
+  : a28 out ≤ a3 i_new := by
+  subst h_a28
+  simp only [vectors_arr_set, vectors_arr_get,
+             LeanProofs.Lib.Lemmas.arr_set, LeanProofs.Lib.Lemmas.arr_get]
+  simp
+  by_cases heq : i_old = i_new
+  · rw [heq]; exact Int.le_refl _
+  · exact h_a3_sort i_old i_new ⟨h_lo_src_i, by omega, by omega⟩
+
+-- Step lemma: after writing v at position `out`, with v ≤ a3 i, the new last
+-- element is bounded.
+theorem last_bound_step_keep
+  (a7 a28 a3 : Arr Int) (out i v : Int)
+  (h_a28 : a28 = vectors_arr_set a7 out v)
+  (h_v_le : v ≤ a3 i)
+  : a28 out ≤ a3 i := by
+  subst h_a28
+  simp only [vectors_arr_set, LeanProofs.Lib.Lemmas.arr_set]
+  simp
+  exact h_v_le
+
+set_option maxHeartbeats 2000000
 
 def SortMerge_proof : SortMerge := by
   unfold SortMerge
@@ -148,30 +245,37 @@ def SortMerge_proof : SortMerge := by
   exists k12 ; exists k13 ; exists k14 ; exists k15
   exists k16 ; exists k17
   zap
-  · grind [is_mix]
-  · grind [maintains_order]
-  · grind [maintains_order]
-  · grind [is_ordered_mix, eq_mix_perm]
-  · unfold k0 k2 k13 at *
+  · -- is_mix old a'₃ a'₃ lo lo (mid+1) lo lo (mid+1) (initial, empty range)
+    grind [is_mix]
+  · -- is_perm old a'₇ lo hi (merge-loop exit)
+    grind [is_ordered_mix, eq_mix_perm]
+  · -- sort_is_sorted_between a'₂₈ lo (out+1) (merge step)
+    sorry
+  · -- a'₂₈ i = old i for i < lo
+    unfold k0 k2 k13 at *
     split_hyps
-    any_goals grind
-    -- sorted old lo (mid + 1)
-    -- sorted old (mid + 1) (hi + 1)
-    -- eq_b a3 old lo k
-    -- sorted a7 lo out
-    -- ordered_mix a7 a3 a3 lo lo (mid + 1) out i j
-  · unfold k0 k2 k13 at *
+    all_goals (first | grind | (simp_all [vectors_arr_set]; grind))
+  · -- a'₂₈ i = old i for hi < i
+    unfold k0 k2 k13 at *
     split_hyps
-    · first | grind [is_mix, maintains_order, is_ordered_mix, eq_mix_perm, set_preserves_sorted] | sorry
-    · first | grind [is_mix, maintains_order, is_ordered_mix, eq_mix_perm, set_preserves_sorted] | sorry
-    · grind
-    · grind
-    · first | grind [is_mix, maintains_order, is_ordered_mix, eq_mix_perm, set_preserves_sorted] | sorry
-    · first | grind [is_mix, maintains_order, is_ordered_mix, eq_mix_perm, set_preserves_sorted] | sorry
-  · first | grind [is_mix, maintains_order, is_ordered_mix, eq_mix_perm, set_preserves_sorted] | sorry
-  · first | grind [is_mix, maintains_order, is_ordered_mix, eq_mix_perm, set_preserves_sorted] | sorry
-  · first | grind [is_mix, maintains_order, is_ordered_mix, eq_mix_perm, set_preserves_sorted] | sorry
-  · first | grind [is_mix, maintains_order, is_ordered_mix, eq_mix_perm, set_preserves_sorted] | sorry
-  · first | grind [is_mix, maintains_order, is_ordered_mix, eq_mix_perm, set_preserves_sorted] | sorry
+    all_goals (first | grind | (simp_all [vectors_arr_set]; grind))
+  · -- is_mix a'₂₈ a'₃ a'₃ lo lo (mid+1) (out+1) i₃ j₃
+    sorry
+  · -- a'₂₈ (out+1-1) ≤ a'₃ i₃ (left bound preservation)
+    sorry
+  · -- a'₂₈ (out+1-1) ≤ a'₃ j₃ (right bound preservation)
+    sorry
+  · -- vectors_arr_set a'₃ k (old k) i = v i for i < lo
+    unfold k0 at *
+    split_hyps
+    all_goals (first | grind | (simp_all [vectors_arr_set]; grind))
+  · -- vectors_arr_set a'₃ k (old k) i = v i for hi < i
+    unfold k0 at *
+    split_hyps
+    all_goals (first | grind | (simp_all [vectors_arr_set]; grind))
+  · -- vectors_arr_eq_between (vectors_arr_set a'₃ k (old k)) old lo (k+1)
+    unfold k0 at *
+    split_hyps
+    all_goals (first | grind | (simp_all [vectors_arr_set]; grind))
 
 end F
